@@ -1,35 +1,26 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import type { Metadata, Viewport } from "next";
+
+import { AppShell } from "@/components/shell/AppShell";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Creator Research Platform", template: "%s · Creator Research Platform" },
-  description: "Market research, video prediction, knowledge assistant and analytics for YouTube creators.",
+  title: { default: "Creator Knowledge Assistant", template: "%s · Creator Knowledge Assistant" },
+  description: "Understand your audience from your own YouTube comments, in Singlish, Sinhala or English.",
 };
 
-const NAV = [
-  { href: "/market-research", label: "Market Research" },
-  { href: "/video-prediction", label: "Video Prediction" },
-  { href: "/knowledge-assistant", label: "Knowledge Assistant" },
-  { href: "/analytics", label: "Analytics" },
-];
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f1014" },
+  ],
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <nav className="topnav">
-          <Link href="/" className="brand">
-            Creator Research
-          </Link>
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href}>
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-        <main>{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

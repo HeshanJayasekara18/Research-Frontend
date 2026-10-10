@@ -20,10 +20,19 @@ src/features/knowledge-assistant/
   api/client.ts       browser client -> /api/knowledge-assistant/*
   server/ragService.ts server-only fetch to the FastAPI service (X-Service-Key, timeout, error mapping)
   server/access.ts    video access check (placeholder until platform auth exists)
-  components/         KnowledgeAssistant (search form), RetrievalResults
+  lib/methods.ts      plain-language method names/descriptions
+  lib/compare.ts      pooling + agreement maths for Evidence & Analysis (unit-tested)
+  hooks/              useHealth, useRecentSearches (browser-only history)
+  components/         AssistantWorkspace, EvidenceAnalysis, DashboardOverview, ScopePicker,
+                      MethodSelect, EvidenceCard, ScoreChart, ServiceStatus
+src/components/shell/ AppShell (sidebar navigation), Icon
 src/app/api/knowledge-assistant/retrieve/route.ts   POST proxy
 src/app/api/knowledge-assistant/health/route.ts     GET proxy
 ```
+
+**Screens:** `/` Dashboard, `/knowledge-assistant` (ask a question, see supporting comments), `/knowledge-assistant/evidence` (compare up to four methods on one question). The UI follows Apple HIG conventions: system font, semantic colours, light/dark mode, visible focus, reduced-motion support.
+
+**Honesty rules in the UI:** no generated answer is shown until the RAG milestone exists. Commenter identities are never shown (they are removed from the corpus). No "relevance %" is shown without human labels: the evidence screen shows method *agreement* instead, and experimental methods are labelled as experimental.
 
 **Security model:** `video_id` is only a search filter. The backend never verifies ownership. `server/access.ts` must check that the signed-in user may access the video. Until platform login exists, it **denies** every request unless `KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS=true` is set, and that flag is ignored in production.
 

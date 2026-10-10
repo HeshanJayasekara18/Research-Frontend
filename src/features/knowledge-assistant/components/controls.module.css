@@ -1,0 +1,30 @@
+.group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.scopeRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.grow {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.scopeNote {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--label-secondary);
+}
+.help {
+  font-size: 0.78rem;
+  color: var(--label-tertiary);
+}
+.error {
+  font-size: 0.78rem;
+  color: var(--red);
+}

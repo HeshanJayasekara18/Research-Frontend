@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# Next.js / build
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# env files (never commit real values)
+.env
+.env.*
+!.env.example
+
+# logs & OS
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# tests
+coverage/

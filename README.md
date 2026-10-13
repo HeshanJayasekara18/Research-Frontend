@@ -36,35 +36,76 @@ src/app/api/knowledge-assistant/health/route.ts     GET proxy
 
 **Security model:** `video_id` is only a search filter. The backend never verifies ownership. `server/access.ts` must check that the signed-in user may access the video. Until platform login exists, it **denies** every request unless `KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS=true` is set, and that flag is ignored in production.
 
-## Local development (Windows PowerShell)
+## Local development (Windows PowerShell, two terminals)
 
-1. Start the backend (see the backend repo `docs/SERVICE_SETUP.md`):
-   ```powershell
-   uvicorn service.main:app --host 127.0.0.1 --port 8000
-   ```
-2. Configure and run this app:
-   ```powershell
-   Copy-Item .env.example .env.local    # set KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS=true for local use
-   npm install
-   npm run dev                          # http://localhost:3000/knowledge-assistant
-   ```
-3. Checks:
-   ```powershell
-   npm run typecheck; npm run lint; npm test; npm run build
-   ```
+### Terminal 1: backend (C3 FastAPI service)
+
+Run from the **backend repository root**. The app object is `app` in `src/rag_service/api/main.py`, so the module path is `rag_service.api.main:app`.
+
+```powershell
+cd <path>\Explainable-RAG-Knowledge-Assistant-Backend
+$env:RAG_SERVICE_API_KEY = "dev-local-key" # any local value; must match KNOWLEDGE_ASSISTANT_API_KEY below
+python run.py                              # starts uvicorn on 127.0.0.1:8000 with reload
+```
+
+`run.py` adds `src/` to the path itself and reads the backend `.env` if present. The equivalent manual command is `$env:PYTHONPATH = "src"; python -m uvicorn rag_service.api.main:app --host 127.0.0.1 --port 8000 --reload`.
+
+Wait for `Application startup complete.`, then check http://127.0.0.1:8000/v1/health (API docs: http://127.0.0.1:8000/docs). Backend setup and dependencies are covered in the backend's `docs/SERVICE_SETUP.md`.
+
+### Terminal 2: frontend (this repository)
+
+```powershell
+cd <path>\Reserch-Frontend
+Copy-Item .env.example .env.local          # first time only; then edit .env.local (values below)
+npm install                                # first time only
+npm run dev                                # http://localhost:3000/knowledge-assistant
+```
+
+Minimum `.env.local` for local development:
+
+```
+KNOWLEDGE_ASSISTANT_API_URL=http://127.0.0.1:8000
+KNOWLEDGE_ASSISTANT_API_KEY=dev-local-key
+KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS=true
+```
+
+Next.js only reads `.env.local` at startup, so restart `npm run dev` after editing it.
+
+### Checks
+
+```powershell
+npm run typecheck; npm run lint; npm test; npm run build
+```
+
+`npm run build` / `npm start` run in production mode. There the dev video bypass is ignored, so `/api/knowledge-assistant/retrieve` returns `501 auth_not_configured` until platform login is integrated. This is intended.
 
 If `npm install` fails with `UNABLE_TO_VERIFY_LEAF_SIGNATURE` (antivirus or proxy HTTPS inspection), point Node at the Windows trusted certificates (`NODE_EXTRA_CA_CERTS=<exported .pem>`). Do not disable `strict-ssl`.
 
-## Environment variables (server-only)
+## Environment variables
+
+### Backend (Python, FastAPI)
 
 | Name | Purpose |
 |---|---|
-| `KNOWLEDGE_ASSISTANT_API_URL` | FastAPI base URL, e.g. `http://127.0.0.1:8000` |
-| `KNOWLEDGE_ASSISTANT_API_KEY` | Same value as the backend's `RAG_SERVICE_API_KEY` |
-| `KNOWLEDGE_ASSISTANT_TIMEOUT_MS` | Upstream timeout (default 15000) |
-| `KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS` | Dev-only access bypass; ignored in production |
+| `RAG_SERVICE_API_KEY` | Shared secret the backend expects in the `X-Service-Key` header. **Unset = no authentication**, allowed for localhost development only. |
+| `RAG_ENV` | `development` (default) or `production`. With `production` the service **refuses to start** without `RAG_SERVICE_API_KEY`. |
+| `PYTHONPATH=src` | Development shortcut so Python finds `src/rag_service` without installing it. Not needed after `pip install -e .`. |
 
-Never prefix these with `NEXT_PUBLIC_`.
+### Frontend (Next.js, server-side only)
+
+| Name | Purpose |
+|---|---|
+| `KNOWLEDGE_ASSISTANT_API_URL` | Backend base URL, e.g. `http://127.0.0.1:8000` |
+| `KNOWLEDGE_ASSISTANT_API_KEY` | Must equal the backend's `RAG_SERVICE_API_KEY`. Sent only from Route Handlers. |
+| `KNOWLEDGE_ASSISTANT_TIMEOUT_MS` | Upstream timeout (default 15000) |
+| `KNOWLEDGE_ASSISTANT_DEV_ALLOW_ALL_VIDEOS` | Dev-only video access bypass; ignored when `NODE_ENV=production` |
+
+### Security rules
+
+- **The shared key is service-to-service authentication only.** It proves that *this Next.js server* is calling the backend. It is **not** creator login and **not** YouTube channel authorisation. A request with a valid key can search any indexed video. Deciding whether the signed-in user may see a video is the job of `server/access.ts`, using the platform's own login.
+- **Never expose the key to the browser.** Do not use `NEXT_PUBLIC_` names, do not import `server/*` from client components (they `import "server-only"`), and do not send the key in responses.
+- **API-key-free mode is for localhost only.** Start an unauthenticated backend only with `--host 127.0.0.1` on your own machine. Every shared, staging or production deployment must set `RAG_SERVICE_API_KEY` and `RAG_ENV=production`, so the service cannot start unauthenticated.
+- Keep real values in `.env.local` / `.env` (git-ignored). `.env.example` files contain placeholders only.
 
 ## Branches
 

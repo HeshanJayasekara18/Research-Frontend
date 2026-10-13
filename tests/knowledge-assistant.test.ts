@@ -132,7 +132,7 @@ describe("GET /api/knowledge-assistant/health", () => {
 
   it("proxies backend health", async () => {
     vi.stubEnv("KNOWLEDGE_ASSISTANT_API_URL", "http://backend:8000");
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>(async () => new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const res = await GET();
     expect(res.status).toBe(200);

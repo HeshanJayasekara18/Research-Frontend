@@ -2,9 +2,10 @@
 
 import { useId } from "react";
 
+import { ui } from "@/components/ui/styles";
+
 import type { RetrievalMethod } from "../api/types";
 import { METHOD_ORDER, METHODS } from "../lib/methods";
-import styles from "./controls.module.css";
 
 export function MethodSelect({
   value,
@@ -18,11 +19,11 @@ export function MethodSelect({
   const id = useId();
   const info = METHODS[value];
   return (
-    <div className={styles.group}>
-      <label className="field" htmlFor={id}>
+    <div className="grid min-w-0 gap-1.5">
+      <label className={ui.field} htmlFor={id}>
         Retrieval method
       </label>
-      <select id={id} className="input" value={value} onChange={(e) => onChange(e.target.value as RetrievalMethod)}>
+      <select id={id} className={ui.input} value={value} onChange={(e) => onChange(e.target.value as RetrievalMethod)}>
         {METHOD_ORDER.map((m) => {
           const off = METHODS[m].semantic && !semanticReady;
           return (
@@ -34,7 +35,7 @@ export function MethodSelect({
           );
         })}
       </select>
-      <span className={styles.help}>{info.description}</span>
+      <span className="text-[0.78rem] text-label-3">{info.description}</span>
     </div>
   );
 }

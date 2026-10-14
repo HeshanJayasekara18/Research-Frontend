@@ -20,13 +20,13 @@ import { ServiceStatus } from "./ServiceStatus";
 // The stage is a size container (@container), so `cqi` units and @max-[…] / @min-[…]
 // variants respond to the space the stage actually has, with or without the sidebar.
 const STAGE =
-  "stage-dark @container relative mx-auto flex min-h-[calc(100dvh-56px)] w-full flex-col items-center gap-(--gap) overflow-hidden " +
-  "rounded-[clamp(18px,2.4cqi,32px)] border border-white/6 text-label max-md:min-h-[calc(100dvh-124px)] max-md:rounded-[22px] " +
+  "@container relative mx-auto flex min-h-[calc(100dvh-56px)] w-full flex-col items-center gap-(--gap) overflow-hidden " +
+  "rounded-[clamp(18px,2.4cqi,32px)] text-label max-md:min-h-[calc(100dvh-124px)] max-md:rounded-[22px] " +
   "px-[clamp(12px,4cqi,64px)] pb-[clamp(28px,4cqi,56px)] pt-[clamp(14px,2cqi,28px)] " +
   "[--col:clamp(280px,62cqi,860px)] [--gap:clamp(16px,2.2cqi,30px)] [--orb:clamp(112px,15cqi,220px)] " +
   "[@media(max-height:760px)]:[--gap:clamp(12px,1.6cqi,20px)] [@media(max-height:760px)]:[--orb:clamp(88px,11cqi,140px)] " +
   "[@media(max-height:520px)]:[--orb:72px] " +
-  "bg-[radial-gradient(60%_45%_at_50%_0%,rgba(110,90,255,0.16),transparent_70%),radial-gradient(70%_55%_at_50%_100%,rgba(20,130,170,0.35),transparent_70%),linear-gradient(180deg,#0d0f15_0%,#0b1118_60%,#0a1a24_100%)]";
+  "bg-transparent";
 
 /** Before the first search the status pill floats in the corner so the welcome content can centre. */
 const TOPBAR_FLOATING =
@@ -36,16 +36,16 @@ const TOPBAR_FLOATING =
 const COLUMN = "w-[min(100%,var(--col))] @max-[900px]:w-full @min-[1600px]:w-[min(100%,1040px)]";
 
 const TOOL =
-  "inline-flex min-h-[34px] min-w-0 items-center gap-1.5 rounded-full border border-white/12 bg-white/3 px-3 text-[0.82rem] text-label-2 " +
-  "hover:border-white/25 hover:text-label focus-within:border-white/25 focus-within:text-label @min-[1600px]:min-h-10 @min-[1600px]:text-[0.95rem]";
+  "inline-flex min-h-[34px] min-w-0 items-center gap-1.5 rounded-full border border-separator bg-surface px-3 text-[0.82rem] text-label-2 " +
+  "hover:border-tint/40 hover:text-label focus-within:border-tint/40 focus-within:text-label @min-[1600px]:min-h-10 @min-[1600px]:text-[0.95rem]";
 
 const TOOL_INPUT = "w-full min-w-0 border-0 bg-transparent text-[0.82rem] text-label outline-none @min-[1600px]:text-[0.95rem]";
 
 const GHOST_BTN =
-  "inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-white/14 bg-white/4 px-3.5 " +
-  "text-[0.85rem] text-label no-underline hover:bg-white/9";
+  "inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-separator bg-surface px-3.5 " +
+  "text-[0.85rem] text-label no-underline hover:bg-fill";
 
-const PANEL = "w-full min-w-0 rounded-[20px] border border-white/8 bg-white/[0.035] p-[clamp(14px,2cqi,24px)] backdrop-blur-md";
+const PANEL = "w-full min-w-0 rounded-[20px] border border-separator bg-surface shadow-soft p-[clamp(14px,2cqi,24px)] backdrop-blur-md";
 
 const META = "text-[0.78rem] text-label-3 wrap-anywhere";
 
@@ -181,7 +181,7 @@ export function AssistantWorkspace() {
         </div>
         {!started && (
           <>
-            <p className="m-0 text-[clamp(1.35rem,2.6cqi,2.4rem)] font-semibold tracking-[-0.02em] text-white/45">
+            <p className="m-0 text-[clamp(1.35rem,2.6cqi,2.4rem)] font-semibold tracking-[-0.02em] text-label-3">
               Hi, I&apos;m {BOT_NAME}
             </p>
             <h1 className="text-balance text-[clamp(1.6rem,3.6cqi,3.2rem)] font-bold leading-[1.12] tracking-[-0.025em]">
@@ -197,17 +197,17 @@ export function AssistantWorkspace() {
       <form
         className={cn(
           COLUMN,
-          "glow-border rounded-[22px] border border-[rgba(120,200,255,0.25)] bg-linear-to-b from-[rgba(76,194,255,0.22)] to-[rgba(76,194,255,0.08)] p-1",
-          "shadow-[0_20px_60px_rgba(0,0,0,0.35),0_0_40px_rgba(76,194,255,0.08)]",
+          "glow-border rounded-[22px] border border-tint/30 bg-tint-soft p-1",
+          "shadow-soft",
         )}
         onSubmit={onSubmit}
         aria-busy={loading}
       >
-        <div className="flex items-center gap-2 px-3 pb-2 pt-1.5 text-[0.8rem] text-white/80 @max-[640px]:text-[0.75rem] @min-[1600px]:text-[0.95rem]">
+        <div className="flex items-center gap-2 px-3 pb-2 pt-1.5 text-[0.8rem] text-label-2 @max-[640px]:text-[0.75rem] @min-[1600px]:text-[0.95rem]">
           <Icon name="sparkle" size={14} />
           Searches your YouTube comments. Written answers are coming soon.
         </div>
-        <div className="rounded-[18px] border border-white/6 bg-[#090b10] px-3.5 pb-2.5 pt-3.5 @max-[300px]:px-2.5">
+        <div className="rounded-[18px] border border-separator bg-surface px-3.5 pb-2.5 pt-3.5 @max-[300px]:px-2.5">
           <label htmlFor={`${ids}-q`} className="sr-only">
             Your question
           </label>
@@ -268,7 +268,7 @@ export function AssistantWorkspace() {
                 </label>
                 <select
                   id={`${ids}-m`}
-                  className={cn(TOOL_INPUT, "[&_option]:bg-[#14161d] [&_option]:text-[#f4f5f8]")}
+                  className={cn(TOOL_INPUT, "[&_option]:bg-surface [&_option]:text-label")}
                   value={method}
                   onChange={(e) => {
                     methodTouched.current = true;
@@ -321,8 +321,8 @@ export function AssistantWorkspace() {
                   type="button"
                   onClick={() => applySuggestion(s)}
                   className={
-                    "grid size-full cursor-pointer content-start gap-1.5 rounded-2xl border border-white/7 bg-white/[0.035] px-4 py-3.5 text-left text-label " +
-                    "transition hover:-translate-y-px hover:border-white/14 hover:bg-white/7 @max-[640px]:px-3.5 @max-[640px]:py-3"
+                    "grid size-full cursor-pointer content-start gap-1.5 rounded-2xl border border-separator bg-surface px-4 py-3.5 text-left text-label " +
+                    "transition hover:-translate-y-px hover:border-tint/40 hover:bg-fill @max-[640px]:px-3.5 @max-[640px]:py-3"
                   }
                 >
                   <span className="inline-flex items-center gap-2 text-[0.92rem] font-semibold @min-[1600px]:text-[1.05rem]">

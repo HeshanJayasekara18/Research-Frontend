@@ -1,7 +1,7 @@
-import { DashboardOverview } from "@/features/knowledge-assistant/components/DashboardOverview";
+import { DashboardBody } from "@/features/dashboard/components/DashboardBody";
+import { resolveDashboardAssets } from "@/features/dashboard/lib/assets";
 
-// The shared dashboard currently shows C3's Knowledge Assistant overview.
-// Other components can add their own sections here through their PRs.
+// Shared dashboard (all four research components). Image slots resolve on the server.
 export default function Home() {
-  return <DashboardOverview />;
+  return <DashboardBody assets={resolveDashboardAssets()} />;
 }

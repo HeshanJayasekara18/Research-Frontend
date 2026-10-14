@@ -197,7 +197,7 @@ export function AssistantWorkspace() {
       <form
         className={cn(
           COLUMN,
-          "rounded-[22px] border border-[rgba(120,200,255,0.25)] bg-linear-to-b from-[rgba(76,194,255,0.22)] to-[rgba(76,194,255,0.08)] p-1",
+          "glow-border rounded-[22px] border border-[rgba(120,200,255,0.25)] bg-linear-to-b from-[rgba(76,194,255,0.22)] to-[rgba(76,194,255,0.08)] p-1",
           "shadow-[0_20px_60px_rgba(0,0,0,0.35),0_0_40px_rgba(76,194,255,0.08)]",
         )}
         onSubmit={onSubmit}

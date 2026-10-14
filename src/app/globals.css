@@ -3,7 +3,7 @@
 /* Design tokens (Apple HIG-style semantic colours) for light and dark mode.
    They are exposed to Tailwind through @theme below, e.g. bg-surface, text-label. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --bg: #f5f6fa;
   --surface: #ffffff;
   --surface-raised: #ffffff;
@@ -27,8 +27,61 @@
   --series-4: #e08a2e;
 }
 
+/* Dark */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1014;
+  --surface: #1a1b20;
+  --surface-raised: #222329;
+  --label: #f5f5f7;
+  --label-secondary: #c7c7cc;
+  --label-tertiary: #8e8e93;
+  --separator: rgba(84, 84, 88, 0.48);
+  --fill: rgba(120, 120, 128, 0.2);
+  --fill-strong: rgba(120, 120, 128, 0.32);
+  --tint: #8c96ff;
+  --tint-2: #b49bff;
+  --tint-soft: rgba(140, 150, 255, 0.16);
+  --green: #30d158;
+  --orange: #ff9f0a;
+  --red: #ff453a;
+  --hero: linear-gradient(135deg, #1e2140 0%, #261f3d 55%, #1a2638 100%);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --series-1: #6f97ff;
+  --series-2: #3cc8c0;
+  --series-3: #a98bff;
+  --series-4: #f0a24a;
+}
+
+/* Super dark: true black for maximum focus / OLED screens, slightly brighter text for contrast. */
+:root[data-theme="superdark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0a0a0b;
+  --surface-raised: #121214;
+  --label: #ffffff;
+  --label-secondary: #d1d1d6;
+  --label-tertiary: #98989f;
+  --separator: rgba(255, 255, 255, 0.1);
+  --fill: rgba(255, 255, 255, 0.06);
+  --fill-strong: rgba(255, 255, 255, 0.11);
+  --tint: #9aa2ff;
+  --tint-2: #bba6ff;
+  --tint-soft: rgba(154, 162, 255, 0.15);
+  --green: #32d74b;
+  --orange: #ffa31a;
+  --red: #ff5147;
+  --hero: linear-gradient(135deg, #0b0b14 0%, #120b18 55%, #08101a 100%);
+  --shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.6);
+  --series-1: #7ea2ff;
+  --series-2: #45d6cd;
+  --series-3: #b49bff;
+  --series-4: #ffae52;
+}
+
+/* No-JS fallback: follow the OS until the theme script sets data-theme. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #0f1014;
     --surface: #1a1b20;
     --surface-raised: #222329;
@@ -144,5 +197,98 @@
   * {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* ---- Premium light border (used on the assistant composer) ----
+   A soft beam of light travels around the edge. @property lets the conic-gradient
+   angle animate smoothly; Tailwind can't express that, so it lives here as a utility.
+   Reduced-motion users get a static glow (the global rule above stops the animation). */
+@property --beam-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes beam-spin {
+  to {
+    --beam-angle: 360deg;
+  }
+}
+
+@utility glow-border {
+  position: relative;
+  isolation: isolate;
+
+  /* Sharp travelling highlight on the border itself. */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 1;
+    padding: 1.5px;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--beam-angle),
+      transparent 0deg,
+      transparent 230deg,
+      rgba(125, 211, 252, 0.9) 290deg,
+      #ffffff 320deg,
+      rgba(196, 181, 253, 0.95) 342deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.8;
+    pointer-events: none;
+    animation: beam-spin 5s linear infinite;
+    transition: opacity 0.3s ease;
+  }
+
+  /* Soft halo that follows the beam, outside the box. */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    z-index: -1;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--beam-angle),
+      transparent 0deg,
+      transparent 240deg,
+      rgba(56, 189, 248, 0.55) 300deg,
+      rgba(167, 139, 250, 0.6) 340deg,
+      transparent 360deg
+    );
+    filter: blur(14px);
+    opacity: 0.55;
+    pointer-events: none;
+    animation: beam-spin 5s linear infinite;
+    transition: opacity 0.3s ease;
+  }
+
+  /* Brighter and faster while the user is typing. */
+  &:focus-within::before {
+    opacity: 1;
+    animation-duration: 3s;
+  }
+  &:focus-within::after {
+    opacity: 0.85;
+    animation-duration: 3s;
+  }
+}
+
+/* ---- Dashboard body: small entrance transition (dashboard-scoped; reduced-motion rule above disables it) ---- */
+@keyframes dash-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

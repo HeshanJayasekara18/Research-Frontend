@@ -1,3 +1,5 @@
+import { cn, ui } from "@/components/ui/styles";
+
 export interface ChartSeries {
   name: string;
   color: string;
@@ -7,7 +9,7 @@ export interface ChartSeries {
 /** Grouped bar chart (rank on x, relative score on y). Plain SVG, no chart library. */
 export function ScoreChart({ series }: { series: ChartSeries[] }) {
   const ranks = Math.max(0, ...series.map((s) => s.values.length));
-  if (!series.length || !ranks) return <p className="caption">No scores to chart.</p>;
+  if (!series.length || !ranks) return <p className={ui.caption}>No scores to chart.</p>;
 
   const W = 320;
   const H = 170;
@@ -21,7 +23,7 @@ export function ScoreChart({ series }: { series: ChartSeries[] }) {
   const summary = series.map((s) => `${s.name}: ${s.values.map((v) => Math.round(v * 100) + "%").join(", ")}`).join("; ");
 
   return (
-    <figure style={{ margin: "12px 0 0" }}>
+    <figure className="mx-0 mb-0 mt-3">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Relative score by rank. ${summary}`}>
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
@@ -57,10 +59,10 @@ export function ScoreChart({ series }: { series: ChartSeries[] }) {
           );
         })}
       </svg>
-      <figcaption style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", marginTop: 8 }}>
+      <figcaption className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
         {series.map((s) => (
-          <span key={s.name} className="caption" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color }} aria-hidden />
+          <span key={s.name} className={cn(ui.caption, "inline-flex items-center gap-1.5")}>
+            <span className="size-2.5 rounded-[3px]" style={{ background: s.color }} aria-hidden />
             {s.name}
           </span>
         ))}

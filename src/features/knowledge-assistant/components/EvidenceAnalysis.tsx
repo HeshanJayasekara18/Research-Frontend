@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Icon } from "@/components/shell/Icon";
+import { cn, pill, ui } from "@/components/ui/styles";
 
 import { retrieveComments } from "../api/client";
 import { QUERY_MAX_CHARS, type RetrievalMethod } from "../api/types";
@@ -12,7 +13,6 @@ import { poolCandidates, summarize, type MethodRun } from "../lib/compare";
 import { COMPARE_DEFAULT, METHOD_ORDER, METHODS } from "../lib/methods";
 import { extractVideoId, ScopePicker, scopeError, type Scope } from "./ScopePicker";
 import { ScoreChart } from "./ScoreChart";
-import styles from "./analysis.module.css";
 
 const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 const MAX_METHODS = 4;
@@ -82,23 +82,23 @@ export function EvidenceAnalysis() {
   const colour = (m: RetrievalMethod) => SERIES[(runs ?? []).findIndex((r) => r.method === m) % SERIES.length];
 
   return (
-    <div className="page">
-      <header className={styles.head}>
+    <div className={ui.page}>
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="page-title">Evidence &amp; Analysis</h1>
-          <p className="page-subtitle">Run one question through several retrieval methods and compare what each one finds.</p>
+          <h1 className={ui.pageTitle}>Evidence &amp; Analysis</h1>
+          <p className={ui.pageSubtitle}>Run one question through several retrieval methods and compare what each one finds.</p>
         </div>
       </header>
 
       <form
-        className={`card ${styles.queryCard}`}
+        className={cn(ui.card, "grid gap-4")}
         onSubmit={(e) => {
           e.preventDefault();
           void run();
         }}
       >
-        <div className={styles.queryRow}>
-          <span className={styles.qIcon} aria-hidden>
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 flex-none place-items-center rounded-xl bg-tint-soft text-tint" aria-hidden>
             <Icon name="chat" />
           </span>
           <label htmlFor="ea-query" className="sr-only">
@@ -106,7 +106,7 @@ export function EvidenceAnalysis() {
           </label>
           <textarea
             id="ea-query"
-            className={styles.query}
+            className="min-w-0 flex-1 resize-y rounded-[14px] border border-separator bg-bg px-3 py-2.5 text-base text-label focus:border-tint focus:outline-none focus:ring-[3px] focus:ring-tint-soft"
             rows={2}
             maxLength={QUERY_MAX_CHARS}
             value={query}
@@ -114,11 +114,11 @@ export function EvidenceAnalysis() {
             placeholder="Type a question in Singlish, Sinhala or English"
           />
         </div>
-        <div className={styles.queryControls}>
+        <div className="grid items-end gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto]">
           <ScopePicker value={scope} onChange={setScope} />
-          <fieldset className={styles.methods}>
-            <legend className="field">Methods to compare (up to {MAX_METHODS})</legend>
-            <div className={styles.chips}>
+          <fieldset className="m-0 min-w-0 border-0 p-0">
+            <legend className={cn(ui.field, "mb-1.5 p-0")}>Methods to compare (up to {MAX_METHODS})</legend>
+            <div className="flex flex-wrap gap-1.5">
               {METHOD_ORDER.map((m) => {
                 const off = METHODS[m].semantic && !health.semanticReady;
                 const on = methods.includes(m);
@@ -126,7 +126,7 @@ export function EvidenceAnalysis() {
                   <button
                     key={m}
                     type="button"
-                    className={styles.chip}
+                    className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-full border border-separator bg-surface px-3 text-[0.82rem] text-label-2 aria-pressed:border-transparent aria-pressed:bg-tint-soft aria-pressed:font-semibold aria-pressed:text-tint disabled:cursor-not-allowed disabled:opacity-40"
                     aria-pressed={on}
                     disabled={off || (!on && methods.length >= MAX_METHODS)}
                     title={off ? "Meaning search is not available on the server" : METHODS[m].description}
@@ -139,10 +139,10 @@ export function EvidenceAnalysis() {
               })}
             </div>
           </fieldset>
-          <div className={styles.runRow}>
-            <label className="field">
+          <div className="flex items-end gap-2.5">
+            <label className={ui.field}>
               Top K
-              <select className="input" value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
+              <select className={cn(ui.input, "w-[76px]")} value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
                 {[5, 10, 20].map((k) => (
                   <option key={k} value={k}>
                     {k}
@@ -150,7 +150,7 @@ export function EvidenceAnalysis() {
                 ))}
               </select>
             </label>
-            <button type="submit" className="btn btn-primary" disabled={!canRun}>
+            <button type="submit" className={cn(ui.btn, ui.btnPrimary)} disabled={!canRun}>
               {loading ? "Running…" : "Run comparison"}
             </button>
           </div>
@@ -158,9 +158,9 @@ export function EvidenceAnalysis() {
       </form>
 
       {runs && first && (
-        <p className={styles.runMeta}>
-          <span className="pill">{first.scope.type === "video" ? `Video ${first.scope.video_id}` : "All videos"}</span>
-          <span className="caption">
+        <p className="-mt-2 mb-0 flex items-center gap-2.5">
+          <span className={pill()}>{first.scope.type === "video" ? `Video ${first.scope.video_id}` : "All videos"}</span>
+          <span className={ui.caption}>
             {first.scope.documents_searched.toLocaleString()} comments searched
             {ranAt ? ` · ${ranAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
           </span>
@@ -168,47 +168,47 @@ export function EvidenceAnalysis() {
       )}
 
       {runs && (
-        <section aria-labelledby="mc-title" className="card">
-          <div className={styles.sectionHead}>
-            <h2 id="mc-title" className="section-title">
+        <section aria-labelledby="mc-title" className={ui.card}>
+          <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+            <h2 id="mc-title" className={ui.sectionTitle}>
               Method comparison
             </h2>
-            <span className="caption">Scores are only comparable within one method. Bars show each score relative to that method&apos;s top result.</span>
+            <span className={ui.caption}>Scores are only comparable within one method. Bars show each score relative to that method&apos;s top result.</span>
           </div>
-          <div className={styles.methodGrid}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3">
             {summaries.map((s, i) => {
               const r = runs[i];
               return (
-                <div key={s.method} className={styles.methodCard} style={{ "--c": colour(s.method) } as React.CSSProperties}>
-                  <div className={styles.methodName}>
+                <div key={s.method} className="grid content-start gap-3 rounded-[14px] border border-t-[3px] border-separator border-t-(--c) bg-bg p-4" style={{ "--c": colour(s.method) } as React.CSSProperties}>
+                  <div className="grid">
                     <strong>{METHODS[s.method].short}</strong>
-                    <span className="caption">{METHODS[s.method].label}</span>
+                    <span className={ui.caption}>{METHODS[s.method].label}</span>
                   </div>
                   {r.error ? (
-                    <p className={styles.methodErr}>{r.error}</p>
+                    <p className="m-0 text-[0.85rem] text-danger">{r.error}</p>
                   ) : (
                     <>
-                      <div className={styles.stats}>
+                      <div className="grid grid-cols-2 gap-2 [&>div]:grid [&_b]:text-[1.4rem] [&_b]:font-bold [&_b]:tabular-nums">
                         <div>
                           <b>{s.retrieved}</b>
-                          <span className="caption">Retrieved</span>
+                          <span className={ui.caption}>Retrieved</span>
                         </div>
                         <div>
                           <b>{s.agreement === null ? "–" : `${Math.round(s.agreement * 100)}%`}</b>
-                          <span className="caption">Shared with others</span>
+                          <span className={ui.caption}>Shared with others</span>
                         </div>
                       </div>
-                      <ol className={styles.bars}>
+                      <ol className="m-0 grid list-none gap-1.5 p-0 [&>li]:grid [&>li]:grid-cols-[26px_1fr_44px] [&>li]:items-center [&>li]:gap-2">
                         {s.top.map((t) => (
                           <li key={t.documentId}>
-                            <span className="caption">#{t.rank}</span>
-                            <span className={styles.track} aria-hidden>
+                            <span className={ui.caption}>#{t.rank}</span>
+                            <span className="h-2 overflow-hidden rounded bg-fill [&>span]:block [&>span]:h-full [&>span]:rounded [&>span]:bg-(--c)" aria-hidden>
                               <span style={{ width: `${Math.max(4, t.relative * 100)}%` }} />
                             </span>
-                            <span className={styles.num}>{t.score.toFixed(s.method.startsWith("multiview") ? 4 : 2)}</span>
+                            <span className="text-right text-[0.78rem] tabular-nums text-label-2">{t.score.toFixed(s.method.startsWith("multiview") ? 4 : 2)}</span>
                           </li>
                         ))}
-                        {s.top.length === 0 && <li className="caption">No matches</li>}
+                        {s.top.length === 0 && <li className={ui.caption}>No matches</li>}
                       </ol>
                     </>
                   )}
@@ -220,27 +220,27 @@ export function EvidenceAnalysis() {
       )}
 
       {runs && (
-        <div className={styles.lower}>
-          <section aria-labelledby="cand-title" className="card">
-            <div className={styles.sectionHead}>
-              <h2 id="cand-title" className="section-title">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
+          <section aria-labelledby="cand-title" className={ui.card}>
+            <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+              <h2 id="cand-title" className={ui.sectionTitle}>
                 Retrieved candidates
               </h2>
-              <span className="caption">
+              <span className={ui.caption}>
                 {candidates.length} unique comments, ordered by how many methods found them
               </span>
             </div>
             {candidates.length === 0 ? (
-              <p className="muted">No method retrieved any comments. Try rephrasing or a meaning-based method.</p>
+              <p className={ui.muted}>No method retrieved any comments. Try rephrasing or a meaning-based method.</p>
             ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
+              <div className="-mx-2 overflow-x-auto">
+                <table className="w-full border-collapse text-[0.86rem] [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-separator [&_th]:p-2 [&_th]:text-left [&_th]:text-[0.74rem] [&_th]:font-semibold [&_th]:text-label-3 [&_td]:border-b [&_td]:border-separator [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top [&_tr:last-child_td]:border-b-0">
                   <thead>
                     <tr>
                       <th scope="col">Comment</th>
                       {okRuns.map((r) => (
-                        <th key={r.method} scope="col" className={styles.rankCol} title={METHODS[r.method].label}>
-                          <span className={styles.dot} style={{ background: colour(r.method) }} />
+                        <th key={r.method} scope="col" className="whitespace-nowrap text-center! tabular-nums" title={METHODS[r.method].label}>
+                          <span className="mr-1.5 inline-block size-2 rounded-full" style={{ background: colour(r.method) }} />
                           {METHODS[r.method].short}
                         </th>
                       ))}
@@ -251,19 +251,19 @@ export function EvidenceAnalysis() {
                     {candidates.map((c) => {
                       const isSel = selectedCandidate?.comment.document_id === c.comment.document_id;
                       return (
-                        <tr key={c.comment.document_id} aria-selected={isSel} className={isSel ? styles.selRow : undefined}>
+                        <tr key={c.comment.document_id} aria-selected={isSel} className={isSel ? "[&>td]:bg-tint-soft" : undefined}>
                           <td>
-                            <button type="button" className={styles.rowBtn} onClick={() => setSelected(c.comment.document_id)}>
+                            <button type="button" className="block w-full min-w-[220px] cursor-pointer rounded-lg border-0 bg-transparent px-1.5 py-1 text-left text-label hover:bg-fill" onClick={() => setSelected(c.comment.document_id)}>
                               <span lang="si">{c.comment.text.length > 110 ? `${c.comment.text.slice(0, 110)}…` : c.comment.text}</span>
                             </button>
                           </td>
                           {okRuns.map((r) => (
-                            <td key={r.method} className={styles.rankCol}>
-                              {c.ranks[r.method] ? `#${c.ranks[r.method]}` : <span className="caption">–</span>}
+                            <td key={r.method} className="whitespace-nowrap text-center! tabular-nums">
+                              {c.ranks[r.method] ? `#${c.ranks[r.method]}` : <span className={ui.caption}>–</span>}
                             </td>
                           ))}
                           <td>
-                            <span className={c.foundBy === okRuns.length && okRuns.length > 1 ? "pill pill-tint" : "pill"}>
+                            <span className={pill(c.foundBy === okRuns.length && okRuns.length > 1 ? "tint" : "neutral")}>
                               {c.foundBy}/{okRuns.length}
                             </span>
                           </td>
@@ -276,9 +276,9 @@ export function EvidenceAnalysis() {
             )}
           </section>
 
-          <div className={styles.sideStack}>
-            <section aria-labelledby="chart-title" className="card">
-              <h2 id="chart-title" className="section-title">
+          <div className="grid gap-5">
+            <section aria-labelledby="chart-title" className={ui.card}>
+              <h2 id="chart-title" className={ui.sectionTitle}>
                 Relative score by rank
               </h2>
               <ScoreChart
@@ -289,25 +289,25 @@ export function EvidenceAnalysis() {
             </section>
 
             {selectedCandidate && (
-              <section aria-labelledby="sel-title" className={`card ${styles.selected}`}>
-                <h2 id="sel-title" className="section-title">
+              <section aria-labelledby="sel-title" className={cn(ui.card, "grid gap-2.5 [&>p]:m-0 [&>p]:leading-[1.55] [&>p]:wrap-anywhere")}>
+                <h2 id="sel-title" className={ui.sectionTitle}>
                   Selected comment
                 </h2>
                 <p lang="si">{selectedCandidate.comment.text}</p>
-                <div className={styles.selMeta}>
+                <div className="flex flex-wrap gap-1.5">
                   {selectedCandidate.comment.likes !== null && (
-                    <span className="pill">
+                    <span className={pill()}>
                       <Icon name="heart" size={13} /> {selectedCandidate.comment.likes}
                     </span>
                   )}
                   {Object.entries(selectedCandidate.ranks).map(([m, rank]) => (
-                    <span key={m} className="pill">
+                    <span key={m} className={pill()}>
                       {METHODS[m as RetrievalMethod].short} #{rank}
                     </span>
                   ))}
                 </div>
                 {selectedCandidate.comment.video_url && (
-                  <a className="btn btn-plain" href={selectedCandidate.comment.video_url} target="_blank" rel="noopener noreferrer">
+                  <a className={cn(ui.btn, ui.btnPlain)} href={selectedCandidate.comment.video_url} target="_blank" rel="noopener noreferrer">
                     Open video <code>{selectedCandidate.comment.video_id}</code>
                     <Icon name="external" size={14} />
                   </a>
@@ -315,9 +315,9 @@ export function EvidenceAnalysis() {
               </section>
             )}
 
-            <section className={`card ${styles.honest}`}>
-              <h2 className="section-title">Reading these results</h2>
-              <p className="caption">
+            <section className={cn(ui.card, "[&>p]:mt-1.5 [&>p]:mb-0")}>
+              <h2 className={ui.sectionTitle}>Reading these results</h2>
+              <p className={ui.caption}>
                 &ldquo;Shared with others&rdquo; measures agreement between methods, not correctness. Relevance can only be
                 measured against human-labelled judgements, which are being collected for the evaluation study. Experimental
                 methods are not yet validated.
@@ -328,9 +328,9 @@ export function EvidenceAnalysis() {
       )}
 
       {!runs && !loading && (
-        <div className={`card ${styles.emptyState}`}>
+        <div className={cn(ui.card, "grid justify-items-center gap-2 px-5 py-10 text-center text-label-3")}>
           <Icon name="chart" size={28} />
-          <p className="muted">Enter a question, choose up to four methods and run the comparison.</p>
+          <p className={ui.muted}>Enter a question, choose up to four methods and run the comparison.</p>
         </div>
       )}
     </div>

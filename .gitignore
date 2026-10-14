@@ -20,3 +20,6 @@ Thumbs.db
 
 # tests
 coverage/
+
+# Separate build folder for verification builds (NEXT_DIST_DIR)
+.next-verify/

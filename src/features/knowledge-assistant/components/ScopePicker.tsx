@@ -3,9 +3,9 @@
 import { useId } from "react";
 
 import { Icon } from "@/components/shell/Icon";
+import { cn, ui } from "@/components/ui/styles";
 
 import { VIDEO_ID_RE } from "../api/validate";
-import styles from "./controls.module.css";
 
 export interface Scope {
   mode: "video" | "all";
@@ -31,27 +31,27 @@ export function ScopePicker({ value, onChange }: { value: Scope; onChange: (s: S
   const err = value.videoId ? scopeError(value) : null;
 
   return (
-    <div className={styles.group}>
-      <span className="field" id={`${id}-label`}>
+    <div className="grid min-w-0 gap-1.5">
+      <span className={ui.field} id={`${id}-label`}>
         Select scope
       </span>
-      <div className={styles.scopeRow}>
-        <div className="segmented" role="group" aria-labelledby={`${id}-label`}>
-          <button type="button" aria-pressed={value.mode === "video"} onClick={() => onChange({ ...value, mode: "video" })}>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className={ui.segmented} role="group" aria-labelledby={`${id}-label`}>
+          <button type="button" className={ui.segment} aria-pressed={value.mode === "video"} onClick={() => onChange({ ...value, mode: "video" })}>
             One video
           </button>
-          <button type="button" aria-pressed={value.mode === "all"} onClick={() => onChange({ ...value, mode: "all" })}>
+          <button type="button" className={ui.segment} aria-pressed={value.mode === "all"} onClick={() => onChange({ ...value, mode: "all" })}>
             All videos
           </button>
         </div>
         {value.mode === "video" ? (
-          <div className={styles.grow}>
+          <div className="min-w-0 flex-[1_1_200px]">
             <label htmlFor={`${id}-video`} className="sr-only">
               Video ID or YouTube link
             </label>
             <input
               id={`${id}-video`}
-              className="input"
+              className={ui.input}
               value={value.videoId}
               onChange={(e) => onChange({ ...value, videoId: e.target.value })}
               placeholder="Video ID or YouTube link"
@@ -62,13 +62,13 @@ export function ScopePicker({ value, onChange }: { value: Scope; onChange: (s: S
             />
           </div>
         ) : (
-          <span className={styles.scopeNote}>
+          <span className="inline-flex items-center gap-1.5 text-[0.85rem] text-label-2">
             <Icon name="globe" size={16} /> Research corpus
           </span>
         )}
       </div>
       {err && (
-        <span id={`${id}-err`} className={styles.error}>
+        <span id={`${id}-err`} className={cn("text-[0.78rem] text-danger")}>
           {err}
         </span>
       )}

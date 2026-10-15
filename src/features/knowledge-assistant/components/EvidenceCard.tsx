@@ -1,10 +1,11 @@
 import { Icon } from "@/components/shell/Icon";
-import { ui } from "@/components/ui/styles";
+import { cn, ui } from "@/components/ui/styles";
 
 import type { RetrievedComment } from "../api/types";
 import { SCORE_LABEL } from "../lib/methods";
 
-export function EvidenceCard({ comment, maxScore }: { comment: RetrievedComment; maxScore: number }) {
+/** `synthetic`: result comes from the synthetic test fixture, so it gets a label and no (fake) YouTube link. */
+export function EvidenceCard({ comment, maxScore, synthetic = false }: { comment: RetrievedComment; maxScore: number; synthetic?: boolean }) {
   // Bar shows score relative to the top result of THIS response only (scores are not comparable across methods).
   const pct = maxScore > 0 ? Math.max(4, Math.round((comment.score / maxScore) * 100)) : 0;
   return (
@@ -34,10 +35,16 @@ export function EvidenceCard({ comment, maxScore }: { comment: RetrievedComment;
               {SCORE_LABEL[comment.score_type]} {comment.score.toFixed(comment.score_type === "rrf" ? 4 : 2)}
             </span>
           </span>
+          {synthetic && <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[0.72rem] font-semibold text-warn">Synthetic</span>}
+          {comment.domain && <span className={ui.caption}>{comment.domain}{comment.is_reply ? " · reply" : ""}</span>}
           {comment.views && <span className={ui.caption}>{comment.views.map((v) => `${v.view} #${v.rank}`).join(" · ")}</span>}
         </div>
       </div>
-      {comment.video_url && (
+      {synthetic ? (
+        <span className={cn(ui.caption, "col-start-2 self-start sm:col-start-auto")}>
+          Video <code className="font-mono">{comment.video_id}</code> (synthetic, no link)
+        </span>
+      ) : comment.video_url && (
         <a
           className={
             "col-start-2 flex items-center gap-1.5 self-start rounded-[10px] bg-fill px-2.5 py-2 text-[0.8rem] text-label no-underline hover:bg-fill-strong " +

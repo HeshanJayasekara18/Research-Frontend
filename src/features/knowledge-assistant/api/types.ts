@@ -29,11 +29,22 @@ export const QUERY_MAX_CHARS = 1000;
 export const TOP_K_MIN = 1;
 export const TOP_K_MAX = 50;
 
+export const CORPORA = ["v1", "v2"] as const;
+export type CorpusId = (typeof CORPORA)[number];
+export const DOMAINS = ["food", "gaming", "education"] as const;
+export type Domain = (typeof DOMAINS)[number];
+
+export interface RetrieveScope {
+  corpus?: CorpusId;
+  domain?: Domain | null;
+  video_id: string | null;
+}
+
 export interface RetrieveRequest {
   query: string;
   method?: RetrievalMethod;
   top_k?: number;
-  scope?: { video_id: string | null };
+  scope?: RetrieveScope;
 }
 
 export type ScoreType = "bm25" | "char_tfidf_cosine" | "labse_cosine" | "rrf";
@@ -54,6 +65,10 @@ export interface RetrievedComment {
   score: number;
   score_type: ScoreType;
   views: ViewContribution[] | null;
+  // Corpus V2 metadata (null for V1)
+  comment_id?: string | null;
+  domain?: string | null;
+  is_reply?: boolean | null;
 }
 
 export interface NormalizationInfo {
@@ -69,8 +84,10 @@ export interface RetrieveResponse {
   method: RetrievalMethod;
   top_k: number;
   scope: {
-    type: "video" | "global";
+    type: "video" | "global" | "domain";
     video_id: string | null;
+    corpus?: string;
+    domain?: string | null;
     documents_searched: number;
     ownership_verified: false;
   };
@@ -90,6 +107,46 @@ export interface HealthResponse {
   videos: number;
   semantic: { index_present: boolean; loaded: boolean };
   auth_enabled: boolean;
+  llm?: { provider: string; model: string; enabled: boolean } | null;
+  corpora?: Record<string, CorpusSummary> | null;
+}
+
+export interface CorpusSummary {
+  documents: number;
+  videos: number;
+  domains: Record<string, number> | null;
+  semantic_index_present: boolean;
+}
+
+/* ---------- POST /v1/ask (evidence-grounded Sinhala answer) ---------- */
+
+export interface AskRequest {
+  query: string;
+  scope: { corpus?: CorpusId; video_id: string };
+  method?: RetrievalMethod;
+}
+
+export interface EvidenceItem {
+  label: string;
+  document_id: string;
+  video_id: string;
+  comment_text: string;
+  retrieval_rank: number;
+  matched_terms: string[];
+  video_reference: { url: string | null; granularity: "video" };
+}
+
+export interface AskResponse {
+  request_id: string;
+  query: string;
+  status: "answered" | "insufficient_evidence";
+  answer: string | null;
+  insufficient_reason: "no_content_term_match" | "model_declined" | null;
+  citations: EvidenceItem[];
+  evidence_supplied: EvidenceItem[];
+  retrieval: { method: RetrievalMethod; candidates_retrieved: number; candidates_selected: number };
+  generation: { provider: string; model: string; called: boolean };
+  notice: string;
 }
 
 export interface ApiErrorBody {

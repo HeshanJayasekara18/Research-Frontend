@@ -60,5 +60,10 @@ export function useConversations() {
     });
   }, []);
 
-  return { items, save, remove };
+  const clear = useCallback(() => {
+    write([]);
+    setItems([]);
+  }, []);
+
+  return { items, save, remove, clear };
 }

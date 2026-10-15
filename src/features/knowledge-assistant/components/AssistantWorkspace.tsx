@@ -9,12 +9,12 @@ import { cn } from "@/components/ui/styles";
 import type { CorpusId } from "../api/types";
 import { useConversations, type SavedConversation } from "../hooks/useConversations";
 import { useHealth } from "../hooks/useHealth";
-import { timeAgo, useRecentSearches, type RecentSearch } from "../hooks/useRecentSearches";
+import { useRecentSearches, type RecentSearch } from "../hooks/useRecentSearches";
 import { findDemoVideo } from "../lib/demoVideos";
 import { defaultMethod, METHODS } from "../lib/methods";
 import { BOT_NAME, BotOrb } from "./BotOrb";
 import { ChatComposer, type ComposerHandle, type ControlsState } from "./chat/ChatComposer";
-import { HistoryPanel, HistoryToggle } from "./chat/HistoryPanel";
+import { HistoryPanel, HistoryToggle, pastEntries } from "./chat/HistoryPanel";
 import { AssistantMessage, UserMessage } from "./chat/Messages";
 import type { Turn } from "./chat/model";
 import { useChat } from "./chat/useChat";
@@ -100,6 +100,8 @@ export function AssistantWorkspace() {
     saveConversation({ id, title: chat.turns[0].query, updatedAt: Date.now(), turns: chat.turns });
   }, [chat.turns, chat.busy, convId, saveConversation]);
 
+  const pastCount = pastEntries(history.items, recent.items).length;
+
   function openConversation(c: SavedConversation) {
     setConvId(c.id);
     chat.load(c.turns);
@@ -138,7 +140,10 @@ export function AssistantWorkspace() {
     methodTouched.current = true;
     const c: ControlsState = { corpus: demo?.corpus ?? "v1", domain: "", videoId: demo?.videoId ?? "", method: r.method };
     setControls(c);
+    setConvId(null);
+    chat.reset();
     chat.send(r.query, { corpus: c.corpus, domain: null, videoId: c.videoId || null }, c.method);
+    closeOnSmall();
   }
 
   function newChat() {
@@ -177,16 +182,13 @@ export function AssistantWorkspace() {
                 onNewChat={newChat}
                 busy={chat.busy}
                 composer={composerEl}
-                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={history.items.length} />}
+                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={pastCount} />}
               />
             ) : (
               <WelcomeView
                 health={<ServiceStatus state={health} />}
-                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={history.items.length} />}
+                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={pastCount} />}
                 composer={composerEl}
-                recent={recent.items}
-                onReopen={reopen}
-                onClearRecent={recent.clear}
                 onSuggestion={(q) => {
                   setDraft(q);
                   composer.current?.focus();
@@ -202,6 +204,14 @@ export function AssistantWorkspace() {
             onOpen={openConversation}
             onDelete={deleteConversation}
             onNewChat={newChat}
+            recent={recent.items}
+            onRerun={reopen}
+            onDeleteRecent={recent.remove}
+            onClearAll={() => {
+              history.clear();
+              recent.clear();
+              if (started) newChat();
+            }}
           />
         </div>
       </LayoutGroup>
@@ -215,17 +225,11 @@ function WelcomeView({
   health,
   historyToggle,
   composer,
-  recent,
-  onReopen,
-  onClearRecent,
   onSuggestion,
 }: {
   health: React.ReactNode;
   historyToggle: React.ReactNode;
   composer: React.ReactNode;
-  recent: RecentSearch[];
-  onReopen: (r: RecentSearch) => void;
-  onClearRecent: () => void;
   onSuggestion: (q: string) => void;
 }) {
   return (
@@ -261,33 +265,6 @@ function WelcomeView({
           ))}
         </div>
 
-        {recent.length > 0 && (
-          <section className="w-full" aria-labelledby="recent-title">
-            <div className="mb-1 flex items-center justify-between">
-              <h2 id="recent-title" className="text-[0.74rem] font-semibold uppercase tracking-[0.04em] text-label-3">
-                Recent
-              </h2>
-              <button type="button" onClick={onClearRecent} className="text-[0.78rem] text-label-3 hover:text-label">
-                Clear
-              </button>
-            </div>
-            <ul className="m-0 grid list-none gap-0.5 p-0">
-              {recent.slice(0, 4).map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    onClick={() => onReopen(r)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-label-3 hover:bg-fill"
-                  >
-                    <Icon name="clock" size={14} />
-                    <span className="min-w-0 flex-1 truncate text-[0.86rem] text-label">{r.query}</span>
-                    <span className="flex-none text-[0.74rem]">{timeAgo(r.at)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
     </div>
   );

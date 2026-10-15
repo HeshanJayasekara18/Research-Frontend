@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Icon } from "@/components/shell/Icon";
 import { cn } from "@/components/ui/styles";
 
-import { timeAgo } from "../../hooks/useRecentSearches";
+import { timeAgo, type RecentSearch } from "../../hooks/useRecentSearches";
 import type { SavedConversation } from "../../hooks/useConversations";
 
 /**
@@ -20,7 +20,15 @@ export function HistoryPanel({
   onOpen,
   onDelete,
   onNewChat,
+  recent,
+  onRerun,
+  onDeleteRecent,
+  onClearAll,
 }: {
+  recent: RecentSearch[];
+  onRerun: (r: RecentSearch) => void;
+  onDeleteRecent: (id: string) => void;
+  onClearAll: () => void;
   open: boolean;
   onClose: () => void;
   items: SavedConversation[];
@@ -36,6 +44,8 @@ export function HistoryPanel({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  const entries = pastEntries(items, recent);
 
   return (
     <>
@@ -80,34 +90,42 @@ export function HistoryPanel({
         </div>
 
         <div className="no-scrollbar min-h-0 min-w-[280px] flex-1 overflow-y-auto p-2">
-          {items.length === 0 ? (
+          {entries.length === 0 ? (
             <p className="m-0 px-2 py-6 text-center text-[0.84rem] text-label-3">
-              No past chats yet. Conversations are saved in this browser after each answer.
+              No past chats yet. Your questions are saved here in this browser.
             </p>
           ) : (
             <ul className="m-0 grid list-none gap-0.5 p-0">
-              {items.map((c) => {
-                const active = c.id === activeId;
+              {entries.map((e) => {
+                const active = e.kind === "chat" && e.c.id === activeId;
+                const title = e.kind === "chat" ? e.c.title : e.r.query;
                 return (
-                  <li key={c.id} className="group relative">
+                  <li key={e.key} className="group relative">
                     <button
                       type="button"
-                      onClick={() => onOpen(c)}
+                      onClick={() => (e.kind === "chat" ? onOpen(e.c) : onRerun(e.r))}
                       aria-current={active || undefined}
+                      title={e.kind === "search" ? "Run this question again" : undefined}
                       className={cn(
-                        "grid w-full gap-0.5 rounded-xl px-3 py-2 pr-9 text-left transition-colors",
+                        "grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 rounded-xl px-3 py-2 pr-9 text-left transition-colors",
                         active ? "bg-tint-soft" : "hover:bg-fill",
                       )}
                     >
-                      <span className={cn("truncate text-[0.86rem]", active ? "font-semibold text-tint" : "text-label")}>{c.title}</span>
-                      <span className="text-[0.72rem] text-label-3">
-                        {c.turns.length} {c.turns.length === 1 ? "question" : "questions"} · {timeAgo(c.updatedAt)}
+                      <span className={cn("mt-0.5", active ? "text-tint" : "text-label-3")} aria-hidden>
+                        <Icon name={e.kind === "chat" ? "chat" : "clock"} size={14} />
+                      </span>
+                      <span className={cn("truncate text-[0.86rem]", active ? "font-semibold text-tint" : "text-label")}>{title}</span>
+                      <span className="col-start-2 text-[0.72rem] text-label-3">
+                        {e.kind === "chat"
+                          ? `${e.c.turns.length} ${e.c.turns.length === 1 ? "question" : "questions"}`
+                          : "Earlier search · runs again"}{" "}
+                        · {timeAgo(e.at)}
                       </span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDelete(c.id)}
-                      aria-label={`Delete chat: ${c.title}`}
+                      onClick={() => (e.kind === "chat" ? onDelete(e.c.id) : onDeleteRecent(e.r.id))}
+                      aria-label={`Delete: ${title}`}
                       title="Delete"
                       className="absolute right-1.5 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-label-3 opacity-100 transition hover:bg-fill hover:text-danger lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100"
                     >
@@ -119,10 +137,31 @@ export function HistoryPanel({
             </ul>
           )}
         </div>
-        <p className="m-0 min-w-[280px] flex-none border-t border-separator px-3 py-2 text-[0.7rem] text-label-3">Stored only in this browser.</p>
+        <div className="flex min-w-[280px] flex-none items-center justify-between border-t border-separator px-3 py-2 text-[0.7rem] text-label-3">
+          <span>Stored only in this browser.</span>
+          {entries.length > 0 && (
+            <button type="button" onClick={onClearAll} className="rounded px-1 text-[0.72rem] hover:text-danger">
+              Clear all
+            </button>
+          )}
+        </div>
       </aside>
     </>
   );
+}
+
+/**
+ * One list: saved chats (reopen with their results) + earlier searches that aren't part of a
+ * saved chat (e.g. made before chats were saved; clicking runs them again). Newest first.
+ */
+export function pastEntries(items: SavedConversation[], recent: RecentSearch[]) {
+  const inChats = new Set(items.flatMap((c) => c.turns.map((t) => `${t.query}|${t.scope.videoId ?? ""}`)));
+  return [
+    ...items.map((c) => ({ kind: "chat" as const, key: c.id, at: c.updatedAt, c })),
+    ...recent
+      .filter((r) => !inChats.has(`${r.query}|${r.videoId ?? ""}`))
+      .map((r) => ({ kind: "search" as const, key: r.id, at: r.at, r })),
+  ].sort((a, b) => b.at - a.at);
 }
 
 /** Small toggle shown in the chat header / welcome screen. */

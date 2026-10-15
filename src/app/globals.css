@@ -292,3 +292,12 @@
     transform: none;
   }
 }
+
+/* Scrollable without a visible scrollbar (wheel, touch and keyboard scrolling still work). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

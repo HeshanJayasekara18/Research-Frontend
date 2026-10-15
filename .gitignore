@@ -23,3 +23,5 @@ coverage/
 
 # Separate build folder for verification builds (NEXT_DIST_DIR)
 .next-verify/
+# Any other temporary Next.js build folders (e.g. NEXT_DIST_DIR=.next-dev-verify)
+.next-*/

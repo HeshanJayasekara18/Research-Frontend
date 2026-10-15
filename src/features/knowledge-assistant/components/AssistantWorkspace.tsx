@@ -1,472 +1,375 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { LayoutGroup, motion, MotionConfig } from "motion/react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { Icon, type IconName } from "@/components/shell/Icon";
-import { cn, pill, ui } from "@/components/ui/styles";
+import { Icon } from "@/components/shell/Icon";
+import { cn } from "@/components/ui/styles";
 
-import { KnowledgeAssistantError, retrieveComments } from "../api/client";
-import { QUERY_MAX_CHARS, type RetrievalMethod, type RetrieveResponse } from "../api/types";
+import type { CorpusId } from "../api/types";
+import { useConversations, type SavedConversation } from "../hooks/useConversations";
 import { useHealth } from "../hooks/useHealth";
-import { timeAgo, useRecentSearches, type RecentSearch } from "../hooks/useRecentSearches";
-import { defaultMethod, METHOD_ORDER, METHODS } from "../lib/methods";
+import { useRecentSearches, type RecentSearch } from "../hooks/useRecentSearches";
+import { findDemoVideo } from "../lib/demoVideos";
+import { defaultMethod, METHODS } from "../lib/methods";
 import { BOT_NAME, BotOrb } from "./BotOrb";
-import { EvidenceCard } from "./EvidenceCard";
-import { extractVideoId, scopeError, type Scope } from "./ScopePicker";
+import { ChatComposer, type ComposerHandle, type ControlsState } from "./chat/ChatComposer";
+import { HistoryPanel, HistoryToggle, pastEntries } from "./chat/HistoryPanel";
+import { AssistantMessage, UserMessage } from "./chat/Messages";
+import type { Turn } from "./chat/model";
+import { useChat } from "./chat/useChat";
 import { ServiceStatus } from "./ServiceStatus";
 
-// ---- Tailwind class groups for the dark assistant stage ----
-// The stage is a size container (@container), so `cqi` units and @max-[…] / @min-[…]
-// variants respond to the space the stage actually has, with or without the sidebar.
-const STAGE =
-  "@container relative mx-auto flex min-h-[calc(100dvh-56px)] w-full flex-col items-center gap-(--gap) overflow-hidden " +
-  "rounded-[clamp(18px,2.4cqi,32px)] text-label max-md:min-h-[calc(100dvh-124px)] max-md:rounded-[22px] " +
-  "px-[clamp(12px,4cqi,64px)] pb-[clamp(28px,4cqi,56px)] pt-[clamp(14px,2cqi,28px)] " +
-  "[--col:clamp(280px,62cqi,860px)] [--gap:clamp(16px,2.2cqi,30px)] [--orb:clamp(112px,15cqi,220px)] " +
-  "[@media(max-height:760px)]:[--gap:clamp(12px,1.6cqi,20px)] [@media(max-height:760px)]:[--orb:clamp(88px,11cqi,140px)] " +
-  "[@media(max-height:520px)]:[--orb:72px] " +
-  "bg-transparent";
+// Shared layout transition for the mascot and composer (welcome -> chat).
+// MotionConfig reducedMotion="user" turns these into instant changes for reduced-motion users.
+const SPRING = { type: "spring", stiffness: 260, damping: 30, mass: 0.9 } as const;
 
-/** Before the first search the status pill floats in the corner so the welcome content can centre. */
-const TOPBAR_FLOATING =
-  "absolute inset-x-[clamp(12px,3cqi,40px)] top-[clamp(12px,2cqi,24px)] [@media(max-height:520px)]:static [@media(max-height:520px)]:w-full";
+// Fill the space below the app's top bar (48px) minus <main> padding:
+// desktop py-6 (48px) -> 96px; mobile pt-5 + pb-[104px] (bottom tab bar) -> 172px.
+const HISTORY_OPEN_KEY = "ka-history-open";
 
-/** Centred column shared by the composer, suggestions, recent list and errors. */
-const COLUMN = "w-[min(100%,var(--col))] @max-[900px]:w-full @min-[1600px]:w-[min(100%,1040px)]";
+const FULL_HEIGHT = "h-[calc(100dvh-172px)] md:h-[calc(100dvh-96px)]";
 
-const TOOL =
-  "inline-flex min-h-[34px] min-w-0 items-center gap-1.5 rounded-full border border-separator bg-surface px-3 text-[0.82rem] text-label-2 " +
-  "hover:border-tint/40 hover:text-label focus-within:border-tint/40 focus-within:text-label @min-[1600px]:min-h-10 @min-[1600px]:text-[0.95rem]";
-
-const TOOL_INPUT = "w-full min-w-0 border-0 bg-transparent text-[0.82rem] text-label outline-none @min-[1600px]:text-[0.95rem]";
-
-const GHOST_BTN =
-  "inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-separator bg-surface px-3.5 " +
-  "text-[0.85rem] text-label no-underline hover:bg-fill";
-
-const PANEL = "w-full min-w-0 rounded-[20px] border border-separator bg-surface shadow-soft p-[clamp(14px,2cqi,24px)] backdrop-blur-md";
-
-const META = "text-[0.78rem] text-label-3 wrap-anywhere";
-
-interface Suggestion {
-  icon: IconName;
-  title: string;
-  text: string;
-  query: string;
-}
-
-const SUGGESTIONS: Suggestion[] = [
-  {
-    icon: "chat",
-    title: "What do viewers ask?",
-    text: "Find the questions your audience keeps asking.",
-    query: "Viewers la ahana prashna monawada?",
-  },
-  {
-    icon: "heart",
-    title: "What do they love?",
-    text: "See what people praise in the comments.",
-    query: "Viewers la kamathi monawa gena da?",
-  },
-  {
-    icon: "sparkle",
-    title: "Content ideas",
-    text: "Spot topics viewers want you to cover next.",
-    query: "Ilanga video eka monawa gena karanna kiyala viewers la kiyanne?",
-  },
+const SUGGESTIONS = [
+  "Viewers la ahana prashna monawada?",
+  "Viewers la kamathi monawa gena da?",
+  "Ilanga video eka monawa gena karanna kiyala viewers la kiyanne?",
 ];
 
+/** Knowledge Assistant: centred welcome screen that becomes a conversation after the first message. */
 export function AssistantWorkspace() {
   const health = useHealth();
   const recent = useRecentSearches();
-  const ids = useId();
 
-  const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<Scope>({ mode: "video", videoId: "" });
-  const [method, setMethod] = useState<RetrievalMethod>("bm25");
+  const [draft, setDraft] = useState("");
+  const [controls, setControls] = useState<ControlsState>({ corpus: "v1", domain: "", videoId: "", method: "bm25" });
   const methodTouched = useRef(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<KnowledgeAssistantError | null>(null);
-  const [response, setResponse] = useState<RetrieveResponse | null>(null);
-  const inflight = useRef<AbortController | null>(null);
-  const resultsRef = useRef<HTMLElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composer = useRef<ComposerHandle>(null);
 
-  // Pick the default method once we know whether meaning search is available.
+  const corpora = health.health?.corpora ?? null;
+  const semanticFor = (c: CorpusId) => (corpora?.[c] ? corpora[c].semantic_index_present : c === "v1" && health.semanticReady);
+  const llmEnabled = Boolean(health.health?.llm?.enabled);
+
+  // Default method once we know whether meaning search exists (unless the user already chose).
   useEffect(() => {
-    if (!methodTouched.current && health.health) setMethod(defaultMethod(health.semanticReady));
+    if (!methodTouched.current && health.health) setControls((c) => ({ ...c, method: defaultMethod(health.semanticReady) }));
   }, [health.health, health.semanticReady]);
 
-  const scopeErr = scopeError(scope);
-  const showScopeErr = scope.mode === "video" && scope.videoId.trim() !== "" && scopeErr;
-  const canSend = query.trim().length > 0 && !scopeErr && !loading;
-  const sendHint = !query.trim() ? "Type a question" : scopeErr ? "Add a video ID or link, or choose All videos" : undefined;
+  const addRecent = recent.add;
+  const onSearched = useCallback(
+    (t: Turn) => addRecent({ query: t.query, videoId: t.scope.videoId, method: t.method }),
+    [addRecent],
+  );
+  const chat = useChat({ llmEnabled, onSearched });
+  const started = chat.turns.length > 0;
 
-  async function run(q: string, s: Scope, m: RetrievalMethod) {
-    inflight.current?.abort();
-    const ctrl = new AbortController();
-    inflight.current = ctrl;
-    setLoading(true);
-    setError(null);
-    const videoId = s.mode === "video" ? extractVideoId(s.videoId) : null;
+  // ---- Past chats (saved in this browser) ----
+  const history = useConversations();
+  const [convId, setConvId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Panel starts open on large screens (or as last chosen), closed on small screens.
+  useEffect(() => {
+    let stored: string | null = null;
     try {
-      const res = await retrieveComments({ query: q.trim(), method: m, top_k: 10, scope: { video_id: videoId } }, ctrl.signal);
-      setResponse(res);
-      recent.add({ query: q.trim(), videoId, method: m });
-      requestAnimationFrame(() => resultsRef.current?.focus());
-    } catch (err) {
-      if (ctrl.signal.aborted) return;
-      setResponse(null);
-      setError(err instanceof KnowledgeAssistantError ? err : new KnowledgeAssistantError(0, "unknown_error", "Something went wrong."));
-    } finally {
-      if (inflight.current === ctrl) setLoading(false);
+      stored = localStorage.getItem(HISTORY_OPEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    setHistoryOpen(window.matchMedia("(min-width: 1024px)").matches && stored !== "false");
+  }, []);
+
+  function toggleHistory(next = !historyOpen) {
+    setHistoryOpen(next);
+    if (window.matchMedia("(min-width: 1024px)").matches) {
+      try {
+        localStorage.setItem(HISTORY_OPEN_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
     }
   }
+  const closeOnSmall = () => !window.matchMedia("(min-width: 1024px)").matches && setHistoryOpen(false);
 
-  function onSubmit(e: { preventDefault(): void }) {
-    e.preventDefault();
-    if (canSend) void run(query, scope, method);
+  // Save the conversation whenever a turn finishes.
+  const saveConversation = history.save;
+  useEffect(() => {
+    if (chat.busy || chat.turns.length === 0) return;
+    const id = convId ?? crypto.randomUUID();
+    if (!convId) setConvId(id);
+    saveConversation({ id, title: chat.turns[0].query, updatedAt: Date.now(), turns: chat.turns });
+  }, [chat.turns, chat.busy, convId, saveConversation]);
+
+  const pastCount = pastEntries(history.items, recent.items).length;
+
+  function openConversation(c: SavedConversation) {
+    setConvId(c.id);
+    chat.load(c.turns);
+    setDraft("");
+    closeOnSmall();
   }
 
-  function applySuggestion(s: Suggestion) {
-    setQuery(s.query);
-    inputRef.current?.focus();
+  function deleteConversation(id: string) {
+    history.remove(id);
+    if (id === convId) newChat();
+  }
+
+  // The composer remounts in its new position when the view switches; keep keyboard focus in it.
+  useEffect(() => {
+    if (started) composer.current?.focus();
+  }, [started]);
+
+  function updateControls(p: Partial<ControlsState>) {
+    if (p.method) methodTouched.current = true;
+    setControls((c) => {
+      const next = { ...c, ...p };
+      // Drop a semantic method if the newly chosen corpus has no LaBSE index.
+      if (p.corpus && METHODS[next.method].semantic && !semanticFor(p.corpus)) next.method = "bm25";
+      return next;
+    });
+  }
+
+  function send(text = draft) {
+    if (!text.trim() || chat.busy) return;
+    chat.send(text, { corpus: controls.corpus, domain: controls.domain || null, videoId: controls.videoId || null }, controls.method);
+    setDraft("");
   }
 
   function reopen(r: RecentSearch) {
-    const s: Scope = r.videoId ? { mode: "video", videoId: r.videoId } : { mode: "all", videoId: "" };
+    const demo = findDemoVideo(r.videoId);
     methodTouched.current = true;
-    setQuery(r.query);
-    setScope(s);
-    setMethod(r.method);
-    void run(r.query, s, r.method);
+    const c: ControlsState = { corpus: demo?.corpus ?? "v1", domain: "", videoId: demo?.videoId ?? "", method: r.method };
+    setControls(c);
+    setConvId(null);
+    chat.reset();
+    chat.send(r.query, { corpus: c.corpus, domain: null, videoId: c.videoId || null }, c.method);
+    closeOnSmall();
   }
 
-  function reset() {
-    inflight.current?.abort();
-    setQuery("");
-    setResponse(null);
-    setError(null);
-    setLoading(false);
-    inputRef.current?.focus();
+  function newChat() {
+    chat.reset();
+    setConvId(null);
+    closeOnSmall();
+    setDraft("");
+    requestAnimationFrame(() => composer.current?.focus());
   }
 
-  const compareHref = response
-    ? `/knowledge-assistant/evidence?${new URLSearchParams({
-        q: response.query,
-        ...(response.scope.video_id ? { video: response.scope.video_id } : {}),
-      }).toString()}`
-    : "/knowledge-assistant/evidence";
-
-  const maxScore = response?.results.reduce((m, r) => Math.max(m, r.score), 0) ?? 0;
-  const started = Boolean(response || loading || error);
+  const composerEl = (
+    <ChatComposer
+      ref={composer}
+      value={draft}
+      onChange={setDraft}
+      onSend={() => send()}
+      busy={chat.busy}
+      controls={controls}
+      onControls={updateControls}
+      v2Available={Boolean(corpora?.v2)}
+      domainCounts={corpora?.[controls.corpus]?.domains ?? null}
+      semanticAvailable={semanticFor(controls.corpus)}
+      placeholder={started ? "Ask a follow-up question…" : undefined}
+    />
+  );
 
   return (
-    <div className={cn(STAGE, started ? "[--orb:clamp(56px,6cqi,80px)] [@media(max-height:760px)]:[--orb:52px]" : "justify-center")}>
-      <div className={cn("flex items-center justify-between gap-2", started ? "w-full" : TOPBAR_FLOATING)}>
-        {started ? (
-          <button type="button" className={GHOST_BTN} onClick={reset}>
-            + New search
-          </button>
-        ) : (
-          <span />
-        )}
-        <ServiceStatus state={health} />
-      </div>
-
-      <header className="flex max-w-(--col) flex-col items-center text-center @max-[900px]:max-w-full">
-        <div className={cn("size-(--orb) transition-[width,height] duration-300", !started && "mb-[clamp(14px,2cqi,26px)]")}>
-          <BotOrb size="100%" thinking={loading} priority />
-        </div>
-        {!started && (
-          <>
-            <p className="m-0 text-[clamp(1.35rem,2.6cqi,2.4rem)] font-semibold tracking-[-0.02em] text-label-3">
-              Hi, I&apos;m {BOT_NAME}
-            </p>
-            <h1 className="text-balance text-[clamp(1.6rem,3.6cqi,3.2rem)] font-bold leading-[1.12] tracking-[-0.025em]">
-              How can I help today?
-            </h1>
-            <p className="mt-3 max-w-[46ch] text-pretty text-[clamp(0.85rem,1.1cqi,1rem)] text-label-3 [@media(max-height:520px)]:hidden [@media(max-height:760px)]:mt-1.5">
-              Ask about your audience in Singlish, Sinhala or English. I&apos;ll find what your viewers actually said.
-            </p>
-          </>
-        )}
-      </header>
-
-      <form
-        className={cn(
-          COLUMN,
-          "glow-border rounded-[22px] border border-tint/30 bg-tint-soft p-1",
-          "shadow-soft",
-        )}
-        onSubmit={onSubmit}
-        aria-busy={loading}
-      >
-        <div className="flex items-center gap-2 px-3 pb-2 pt-1.5 text-[0.8rem] text-label-2 @max-[640px]:text-[0.75rem] @min-[1600px]:text-[0.95rem]">
-          <Icon name="sparkle" size={14} />
-          Searches your YouTube comments. Written answers are coming soon.
-        </div>
-        <div className="rounded-[18px] border border-separator bg-surface px-3.5 pb-2.5 pt-3.5 @max-[300px]:px-2.5">
-          <label htmlFor={`${ids}-q`} className="sr-only">
-            Your question
-          </label>
-          <textarea
-            id={`${ids}-q`}
-            ref={inputRef}
-            className={
-              // text-base (16px) stops iOS from zooming into the field.
-              "block max-h-[40dvh] min-h-[52px] w-full resize-y border-0 bg-transparent px-1 pb-2.5 pt-1 text-base leading-normal text-label " +
-              "placeholder:text-label-3 focus:outline-none @min-[1600px]:text-[1.15rem]"
-            }
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) onSubmit(e);
-            }}
-            maxLength={QUERY_MAX_CHARS}
-            rows={2}
-            placeholder="Ask me anything about your viewers…"
-          />
-
-          <div className="flex items-end justify-between gap-2.5">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className={cn(TOOL, "flex-none cursor-pointer whitespace-nowrap @max-[640px]:order-1")}
-                aria-pressed={scope.mode === "all"}
-                onClick={() => setScope({ ...scope, mode: scope.mode === "video" ? "all" : "video" })}
-                title="Switch between one video and all videos"
-              >
-                <Icon name={scope.mode === "video" ? "video" : "globe"} size={15} />
-                {scope.mode === "video" ? "One video" : "All videos"}
-              </button>
-
-              {scope.mode === "video" && (
-                // On phones the video field takes its own row; method + send share the next.
-                <span className={cn(TOOL, "max-w-[260px] flex-[1_1_150px] @max-[640px]:order-2 @max-[640px]:max-w-none @max-[640px]:basis-full")}>
-                  <label htmlFor={`${ids}-v`} className="sr-only">
-                    Video ID or YouTube link
-                  </label>
-                  <input
-                    id={`${ids}-v`}
-                    className={cn(TOOL_INPUT, "aria-[invalid=true]:text-danger")}
-                    value={scope.videoId}
-                    onChange={(e) => setScope({ ...scope, videoId: e.target.value })}
-                    placeholder="Video ID or link"
-                    spellCheck={false}
-                    autoComplete="off"
-                    aria-invalid={Boolean(showScopeErr)}
-                  />
-                </span>
-              )}
-
-              <span className={cn(TOOL, "@max-[640px]:order-3 @max-[640px]:flex-auto")}>
-                <Icon name="chart" size={15} />
-                <label htmlFor={`${ids}-m`} className="sr-only">
-                  Retrieval method
-                </label>
-                <select
-                  id={`${ids}-m`}
-                  className={cn(TOOL_INPUT, "[&_option]:bg-surface [&_option]:text-label")}
-                  value={method}
-                  onChange={(e) => {
-                    methodTouched.current = true;
-                    setMethod(e.target.value as RetrievalMethod);
-                  }}
-                  title={METHODS[method].description}
-                >
-                  {METHOD_ORDER.map((m) => {
-                    const off = METHODS[m].semantic && !health.semanticReady;
-                    return (
-                      <option key={m} value={m} disabled={off}>
-                        {METHODS[m].short}
-                        {METHODS[m].experimental ? " (exp.)" : ""}
-                        {off ? " (unavailable)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </span>
-            </div>
-
-            <button
-              className={
-                "grid size-10 flex-none -rotate-90 cursor-pointer place-items-center rounded-full border-0 bg-linear-to-br from-[#38bdf8] to-[#2563eb] text-white " +
-                "shadow-[0_6px_18px_rgba(56,189,248,0.35)] transition active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none " +
-                "@min-[1600px]:size-[46px]"
-              }
-              type="submit"
-              disabled={!canSend}
-              aria-label={loading ? "Searching" : "Send"}
-              title={sendHint}
-            >
-              {loading ? (
-                <span className="size-4 animate-spin rounded-full border-2 border-white/35 border-t-white" aria-hidden />
-              ) : (
-                <Icon name="arrow" size={18} />
-              )}
-            </button>
-          </div>
-        </div>
-        {showScopeErr && <p className="mx-3 mb-1 mt-2 text-[0.8rem] text-danger">{scopeErr}</p>}
-      </form>
-
-      {!started && (
-        <>
-          <ul className={cn(COLUMN, "m-0 grid list-none grid-cols-3 gap-3 p-0 @max-[640px]:grid-cols-1 @max-[640px]:gap-2")}>
-            {SUGGESTIONS.map((s) => (
-              <li key={s.title}>
-                <button
-                  type="button"
-                  onClick={() => applySuggestion(s)}
-                  className={
-                    "grid size-full cursor-pointer content-start gap-1.5 rounded-2xl border border-separator bg-surface px-4 py-3.5 text-left text-label " +
-                    "transition hover:-translate-y-px hover:border-tint/40 hover:bg-fill @max-[640px]:px-3.5 @max-[640px]:py-3"
-                  }
-                >
-                  <span className="inline-flex items-center gap-2 text-[0.92rem] font-semibold @min-[1600px]:text-[1.05rem]">
-                    <Icon name={s.icon} size={16} /> {s.title}
-                  </span>
-                  <span className="text-[0.8rem] text-label-3 @max-[300px]:hidden @min-[1600px]:text-[0.95rem]">{s.text}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          {recent.items.length > 0 && (
-            <section className={COLUMN} aria-labelledby={`${ids}-recent`}>
-              <div className="mb-1.5 flex items-center justify-between">
-                <h2 id={`${ids}-recent`} className="text-[0.74rem] font-semibold uppercase tracking-[0.04em] text-label-3">
-                  Recent
-                </h2>
-                <button
-                  type="button"
-                  className="cursor-pointer border-0 bg-transparent text-[0.8rem] text-label-3 hover:text-label"
-                  onClick={recent.clear}
-                >
-                  Clear
-                </button>
-              </div>
-              <ul className="m-0 grid list-none gap-0.5 p-0">
-                {recent.items.slice(0, 6).map((r) => (
-                  <li key={r.id}>
-                    <button
-                      type="button"
-                      onClick={() => reopen(r)}
-                      title={r.query}
-                      className={
-                        "grid w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-[10px] border-0 bg-transparent px-2.5 py-2 " +
-                        "text-left text-label-3 hover:bg-fill @max-[640px]:grid-cols-[auto_minmax(0,1fr)]"
-                      }
-                    >
-                      <Icon name="clock" size={14} />
-                      <span className="truncate text-[0.88rem] text-label">{r.query}</span>
-                      <span className="whitespace-nowrap text-[0.75rem] @max-[640px]:col-start-2">
-                        {r.videoId ?? "All videos"} · {timeAgo(r.at)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
-      )}
-
-      {error && (
-        <div className={cn(COLUMN, "grid gap-1 rounded-2xl border border-danger/40 bg-danger/8 px-4 py-3.5 wrap-anywhere")} role="alert">
-          <strong>{error.message}</strong>
-          <span className="text-[0.78rem] text-label-3">
-            {error.code}
-            {error.requestId ? ` · ref ${error.requestId}` : ""}
-          </span>
-        </div>
-      )}
-
-      {loading && !response && <ResultsSkeleton />}
-
-      {response && (
-        <section
-          ref={resultsRef}
-          tabIndex={-1}
-          className="grid w-[min(100%,clamp(280px,72cqi,1000px))] gap-4 outline-none @max-[900px]:w-full"
-          aria-label="Results"
-        >
-          <article className={PANEL}>
-            <div className="mb-2.5 flex flex-wrap items-center gap-3">
-              <BotOrb size={36} />
-              <div className="grid min-w-40 flex-1">
-                <h2 className="text-[1.02rem] font-semibold">{BOT_NAME}&apos;s answer</h2>
-                <span className={META}>Generated answers are the next milestone</span>
-              </div>
-              <span className={pill("warn")}>Coming soon</span>
-            </div>
-            <p className="m-0 text-label-2">
-              For now I show the comments that best match your question, so you can read what viewers said yourself.
-              Written answers, grounded in these comments and checked against them, will appear here.
-            </p>
-          </article>
-
-          <article className={PANEL}>
-            <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
-              <div className="grid min-w-0">
-                <h2 className="text-[1.02rem] font-semibold">Supporting comments</h2>
-                <span className={META}>
-                  {response.result_count} of {response.scope.documents_searched.toLocaleString()} comments ·{" "}
-                  {response.scope.type === "video" ? `video ${response.scope.video_id}` : "all videos"} ·{" "}
-                  {METHODS[response.method].short}
-                </span>
-              </div>
-              <Link href={compareHref} className={GHOST_BTN}>
-                Compare methods <Icon name="arrow" size={15} />
-              </Link>
-            </div>
-
-            {response.normalization && (
-              <p className="mb-2 mt-1 flex flex-wrap items-center gap-2.5 wrap-anywhere">
-                <span className={pill()}>Singlish → Sinhala: {response.normalization.status}</span>
-                {response.normalization.used ? (
-                  <span lang="si">“{response.normalization.normalized_query}”</span>
-                ) : (
-                  <span className={META}>Normalised form not used</span>
-                )}
-              </p>
-            )}
-
-            {response.results.length === 0 ? (
-              <div className="grid gap-1 rounded-[14px] border border-dashed border-separator p-5">
-                <strong>No matching comments found.</strong>
-                <span className="text-label-2">
-                  That doesn&apos;t mean nobody talked about it. Try rephrasing, or switch to a meaning-based method.
-                </span>
-              </div>
+    <MotionConfig reducedMotion="user" transition={SPRING}>
+      <LayoutGroup>
+        <div className={cn("flex w-full", FULL_HEIGHT)}>
+          <div className="mx-auto flex min-w-0 max-w-[880px] flex-1 flex-col">
+            {started ? (
+              <ChatView
+                turns={chat.turns}
+                onRetry={chat.retry}
+                onNewChat={newChat}
+                busy={chat.busy}
+                composer={composerEl}
+                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={pastCount} />}
+              />
             ) : (
-              <ol className="m-0 list-none p-0">
-                {response.results.map((c) => (
-                  <EvidenceCard key={c.document_id} comment={c} maxScore={maxScore} />
-                ))}
-              </ol>
+              <WelcomeView
+                health={<ServiceStatus state={health} />}
+                historyToggle={<HistoryToggle open={historyOpen} onToggle={() => toggleHistory()} count={pastCount} />}
+                composer={composerEl}
+                onSuggestion={(q) => {
+                  setDraft(q);
+                  composer.current?.focus();
+                }}
+              />
             )}
-            <p className="mb-0 mt-3 flex items-start gap-2 border-t border-separator pt-3 text-[0.8rem] text-label-3">
-              <Icon name="info" size={15} /> {response.notice}
-            </p>
-          </article>
-        </section>
-      )}
+          </div>
+          <HistoryPanel
+            open={historyOpen}
+            onClose={() => toggleHistory(false)}
+            items={history.items}
+            activeId={convId}
+            onOpen={openConversation}
+            onDelete={deleteConversation}
+            onNewChat={newChat}
+            recent={recent.items}
+            onRerun={reopen}
+            onDeleteRecent={recent.remove}
+            onClearAll={() => {
+              history.clear();
+              recent.clear();
+              if (started) newChat();
+            }}
+          />
+        </div>
+      </LayoutGroup>
+    </MotionConfig>
+  );
+}
+
+/* ---------------- Welcome state ---------------- */
+
+function WelcomeView({
+  health,
+  historyToggle,
+  composer,
+  onSuggestion,
+}: {
+  health: React.ReactNode;
+  historyToggle: React.ReactNode;
+  composer: React.ReactNode;
+  onSuggestion: (q: string) => void;
+}) {
+  return (
+    <div className="no-scrollbar flex min-h-0 flex-1 flex-col items-center gap-5 overflow-y-auto py-2 sm:gap-6">
+      <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        {health}
+        {historyToggle}
+      </div>
+      <div className="my-auto flex w-full flex-col items-center gap-5 sm:gap-6">
+
+        <div className="flex flex-col items-center text-center">
+          <motion.div layoutId="youbeyo-mascot" className="mb-5 size-[clamp(112px,16vh,168px)]">
+            <BotOrb size="100%" priority />
+          </motion.div>
+          <h1 className="text-[clamp(1.6rem,3vw,2.3rem)] font-bold tracking-[-0.025em]">What would you like to know?</h1>
+          <p className="mb-0 mt-2 text-label-2">Ask about your audience comments in Singlish, Sinhala or English.</p>
+        </div>
+
+        <motion.div layoutId="chat-composer" layout="position" className="w-full">
+          {composer}
+        </motion.div>
+
+        <div className="flex w-full flex-wrap justify-center gap-2">
+          {SUGGESTIONS.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => onSuggestion(q)}
+              className="max-w-full truncate rounded-full border border-separator bg-surface px-3 py-1.5 text-[0.8rem] text-label-2 transition-colors hover:border-tint/40 hover:text-label"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+
+      </div>
     </div>
   );
 }
 
-function ResultsSkeleton() {
+/* ---------------- Chat state ---------------- */
+
+function ChatView({
+  turns,
+  onRetry,
+  onNewChat,
+  busy,
+  composer,
+  historyToggle,
+}: {
+  historyToggle: React.ReactNode;
+  turns: Turn[];
+  onRetry: (id: string) => void;
+  onNewChat: () => void;
+  busy: boolean;
+  composer: React.ReactNode;
+}) {
+  const list = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const prevCount = useRef(0);
+
+  const scrollToBottom = (smooth = true) => list.current?.scrollTo({ top: list.current.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+
+  // New user message -> always follow it (and keep following). Response updates -> only if the reader is
+  // near the bottom. Programmatic scrolls are instant: a smooth scroll emits intermediate scroll events
+  // that would wrongly mark the reader as "scrolled up".
+  useLayoutEffect(() => {
+    const added = turns.length > prevCount.current;
+    prevCount.current = turns.length;
+    if (added) nearBottom.current = true;
+    if (nearBottom.current) scrollToBottom(false);
+  }, [turns]);
+
   return (
-    <div className={PANEL} aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="grid gap-2 py-3">
-          <div className={cn(ui.skeleton, "h-3.5 w-[85%]")} />
-          <div className={cn(ui.skeleton, "h-3.5 w-[60%]")} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Header: title + New chat on the left, small persistent mascot on the right. */}
+      <header className="flex flex-none items-center gap-2 border-b border-separator pb-3 sm:gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[0.92rem] font-semibold sm:text-[0.98rem]">{turns[0]?.query}</h1>
+          <span className="text-[0.76rem] text-label-3">
+            {turns.length} {turns.length === 1 ? "question" : "questions"} · {BOT_NAME}
+          </span>
         </div>
-      ))}
+        <button
+          type="button"
+          onClick={onNewChat}
+          aria-label="New chat"
+          className="inline-flex min-h-9 flex-none items-center gap-1.5 rounded-full border border-separator bg-surface px-3 text-[0.82rem] font-medium hover:bg-fill"
+        >
+          +<span className="max-sm:sr-only"> New chat</span>
+        </button>
+        {historyToggle}
+        <motion.div layoutId="youbeyo-mascot" className="size-10 flex-none sm:size-11">
+          <BotOrb size="100%" thinking={busy} />
+        </motion.div>
+      </header>
+
+      {/* Timeline: the only scrolling region. */}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={list}
+          role="log"
+          aria-live="polite"
+          aria-label="Conversation"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            nearBottom.current = near;
+            setShowJump(!near);
+          }}
+          className="no-scrollbar h-full overflow-y-auto overscroll-contain py-4 sm:py-5"
+        >
+          <ol className="m-0 grid list-none gap-6 p-0 pr-1">
+            {turns.map((t) => (
+              <li key={t.id} className="grid gap-4">
+                <UserMessage turn={t} />
+                <AssistantMessage turn={t} onRetry={onRetry} />
+              </li>
+            ))}
+          </ol>
+        </div>
+        {showJump && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-separator bg-surface-raised px-3 py-1.5 text-[0.8rem] shadow-soft hover:bg-fill"
+          >
+            <span className="rotate-90">
+              <Icon name="arrow" size={14} />
+            </span>
+            Scroll to latest
+          </button>
+        )}
+      </div>
+
+      {/* Composer: pinned below the timeline. */}
+      <motion.div layoutId="chat-composer" layout="position" className="flex-none border-t border-separator pt-3">
+        {composer}
+      </motion.div>
     </div>
   );
 }

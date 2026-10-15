@@ -55,7 +55,15 @@ export function useRecentSearches() {
     setItems([]);
   }, []);
 
-  return { items, add, clear };
+  const remove = useCallback((id: string) => {
+    setItems((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      write(next);
+      return next;
+    });
+  }, []);
+
+  return { items, add, clear, remove };
 }
 
 export function timeAgo(ts: number): string {

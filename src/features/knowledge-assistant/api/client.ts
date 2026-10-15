@@ -1,4 +1,4 @@
-import type { ApiErrorBody, HealthResponse, RetrieveRequest, RetrieveResponse } from "./types";
+import type { ApiErrorBody, AskRequest, AskResponse, HealthResponse, RetrieveRequest, RetrieveResponse } from "./types";
 
 /** Browser-side client. Talks ONLY to this app's Route Handlers, never to the Python service. */
 
@@ -42,6 +42,10 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export function retrieveComments(req: RetrieveRequest, signal?: AbortSignal) {
   return request<RetrieveResponse>("/api/knowledge-assistant/retrieve", { method: "POST", body: JSON.stringify(req), signal });
+}
+
+export function askYoubeyo(req: AskRequest, signal?: AbortSignal) {
+  return request<AskResponse>("/api/knowledge-assistant/ask", { method: "POST", body: JSON.stringify(req), signal });
 }
 
 export function getHealth(signal?: AbortSignal) {

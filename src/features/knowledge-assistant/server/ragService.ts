@@ -23,7 +23,7 @@ export function errorBody(code: string, message: string, requestId?: string): Ap
   return { error: { code, message, ...(requestId ? { request_id: requestId } : {}) } };
 }
 
-export async function callRagService(path: "/v1/retrieve" | "/v1/health", init: { method: "GET" | "POST"; body?: unknown; requestId: string }): Promise<UpstreamResult> {
+export async function callRagService(path: "/v1/retrieve" | "/v1/ask" | "/v1/health", init: { method: "GET" | "POST"; body?: unknown; requestId: string }): Promise<UpstreamResult> {
   const cfg = config();
   if (!cfg) {
     return { status: 500, body: errorBody("upstream_not_configured", "KNOWLEDGE_ASSISTANT_API_URL is not set.", init.requestId) };
